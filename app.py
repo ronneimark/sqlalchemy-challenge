@@ -5,6 +5,7 @@ from sqlalchemy.ext.automap import automap_base
 from sqlalchemy.orm import Session, scoped_session, sessionmaker
 from sqlalchemy import create_engine, func
 import datetime as dt
+from datetime import datetime
 from flask import Flask, jsonify
 import pandas as pd
 
@@ -42,8 +43,8 @@ def welcome():
         f"/api/v1.0/precipitation<br/>"
         f"/api/v1.0/stations<br/>"
         f"/api/v1.0/tobs<br/>"
-        f"/api/v1.0/<start><br/>"
-        f"/api/v1.0/<start>/<end>"
+        f"/api/v1.0/start/yyyy-mm-dd<br/>"
+        f"/api/v1.0/start/mm-dd/end/mm-dd"
     )
 
 @app.route("/api/v1.0/precipitation")
@@ -124,7 +125,91 @@ def tobs():
 
     return jsonify(tobs_list)
 
-# * `/api/v1.0/<start>` and `/api/v1.0/<start>/<end>`
+@app.route("/api/v1.0/start/<start>") 
+def fromstart(start):
+
+    def daily_normals():
+        """Daily Normals.
+    
+        Args:
+            date (str): A date string in the format '%Y-%m-%d'
+        
+        Returns:
+        A list of tuples containing the daily normals, tmin, tavg, and tmax
+    
+        """
+    
+        sel = [func.min(Measurement.tobs), func.avg(Measurement.tobs), func.max(Measurement.tobs)]
+        return session.query(*sel).filter(func.strftime("%Y-%m-%d", Measurement.date) >= start_date).all()
+
+    end = engine.execute("SELECT date FROM Measurement ORDER BY date DESC LIMIT 1").fetchall()
+    end2=end[0]
+    end3=end2[0]
+    end_date = dt.datetime.strptime(end3,'%Y-%m-%d')
+    start_date = dt.datetime.strptime(start,'%Y-%m-%d')
+
+    delta = end_date - start_date
+
+    normals=[]
+    for i in range(delta.days+1):
+        y=(start_date + dt.timedelta(days=i)).strftime('%Y-%m-%d')
+        normals.append(y)
+    
+    normals_list=[]
+
+    for z in normals:
+        daystats = daily_normals()
+        minz=daystats[0][0]
+        avgz=daystats[0][1]
+        maxz=daystats[0][2]
+        dictz="{'date':'" + z + "','min_temp':" + str(minz) +",'avg_temp':" + str(avgz) + ",'max_temp':" + str(maxz)+"}"
+        res = ast.literal_eval(dictz)
+        normals_list.append(res)
+
+    
+    return jsonify(normals_list)
+
+
+@app.route("/api/v1.0/start/<start>/end/<end>")
+def tripdatestats(start,end):
+
+    def daily_normals():
+        """Daily Normals.
+    
+        Args:
+            date (str): A date string in the format '%m-%d'
+        
+        Returns:
+        A list of tuples containing the daily normals, tmin, tavg, and tmax
+    
+        """
+    
+        sel = [func.min(Measurement.tobs), func.avg(Measurement.tobs), func.max(Measurement.tobs)]
+        return session.query(*sel).filter(func.strftime("%m-%d", Measurement.date) == start_date).all()
+
+
+    end_date = dt.datetime.strptime(end, '%m-%d')
+    start_date = dt.datetime.strptime(start,'%m-%d')
+
+    delta = end_date - start_date
+
+    normals=[]
+    for i in range(delta.days+1):
+        y=(start_date + dt.timedelta(days=i)).strftime('%m-%d')
+        normals.append(y)
+    
+    normals_list=[]
+
+    for z in normals:
+        daystats = daily_normals()
+        minz=daystats[0][0]
+        avgz=daystats[0][1]
+        maxz=daystats[0][2]
+        dictz="{'date':'" + z + "','min_temp':" + str(minz) +",'avg_temp':" + str(avgz) + ",'max_temp':" + str(maxz)+"}"
+        res = ast.literal_eval(dictz)
+        normals_list.append(res)
+
+    return jsonify(normals_list)
 
 #   * Return a JSON list of the minimum temperature, the average temperature, and the max temperature for a given start or start-end range.
 
