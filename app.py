@@ -44,15 +44,15 @@ def welcome():
         f"/api/v1.0/stations<br/>"
         f"/api/v1.0/tobs<br/>"
         f"/api/v1.0/start/yyyy-mm-dd<br/>"
-        f"/api/v1.0/start/mm-dd/end/mm-dd"
+        f"/api/v1.0/(start as mm-dd)/(end as mm-dd)"
     )
 
 @app.route("/api/v1.0/precipitation")
 def precipitation():
 
-    #Convert the query results to a Dictionary using `date` 
-    #as the key and `prcp` as the value.
-    #Return the JSON representation of your dictionary.'''
+    '''Convert the query results to a Dictionary using `date` 
+    as the key and `prcp` as the value.
+    Return the JSON representation of your dictionary.'''
 
     fromdb = session.query(Measurement.date, Measurement.prcp)
     prcp_list = []
@@ -87,8 +87,7 @@ def stations():
     return jsonify(stations_list)
 
 @app.route("/api/v1.0/tobs")
-    #query for the dates and temperature observations from a year from the last data point.
-     #Return a JSON list of Temperature Observations (tobs) for the previous year.
+#query for the dates and temperature observations from a year from the last data point. Return a JSON list of Temperature Observations (tobs) for the previous year.
 
 def tobs():
     
@@ -125,8 +124,14 @@ def tobs():
 
     return jsonify(tobs_list)
 
+
+'''Return a JSON list of the minimum temperature, the average temperature, 
+and the max temperature for a given start or start-end range.'''
+
 @app.route("/api/v1.0/start/<start>") 
 def fromstart(start):
+    '''When given the start only, calculate `TMIN`, `TAVG`, and `TMAX` for all dates greater 
+    than and equal to the start date.'''
 
     def daily_normals():
         """Daily Normals.
@@ -169,9 +174,11 @@ def fromstart(start):
     
     return jsonify(normals_list)
 
+@app.route("/api/v1.0/<start>/<end>")
+def tripdatestats(start, end):
 
-@app.route("/api/v1.0/start/<start>/end/<end>")
-def tripdatestats(start,end):
+    '''When given the start and the end date, calculate the `TMIN`, `TAVG`, and `TMAX` for 
+    dates between the start and end date inclusive.'''
 
     def daily_normals():
         """Daily Normals.
@@ -185,7 +192,7 @@ def tripdatestats(start,end):
         """
     
         sel = [func.min(Measurement.tobs), func.avg(Measurement.tobs), func.max(Measurement.tobs)]
-        return session.query(*sel).filter(func.strftime("%m-%d", Measurement.date) == start_date).all()
+        return session.query(*sel).filter(func.strftime("%m-%d", Measurement.date) == dates).all()
 
 
     end_date = dt.datetime.strptime(end, '%m-%d')
@@ -200,22 +207,16 @@ def tripdatestats(start,end):
     
     normals_list=[]
 
-    for z in normals:
+    for dates in normals:
         daystats = daily_normals()
         minz=daystats[0][0]
         avgz=daystats[0][1]
         maxz=daystats[0][2]
-        dictz="{'date':'" + z + "','min_temp':" + str(minz) +",'avg_temp':" + str(avgz) + ",'max_temp':" + str(maxz)+"}"
+        dictz="{'date':'" + dates + "','min_temp':" + str(minz) +",'avg_temp':" + str(avgz) + ",'max_temp':" + str(maxz)+"}"
         res = ast.literal_eval(dictz)
         normals_list.append(res)
 
     return jsonify(normals_list)
-
-#   * Return a JSON list of the minimum temperature, the average temperature, and the max temperature for a given start or start-end range.
-
-#   * When given the start only, calculate `TMIN`, `TAVG`, and `TMAX` for all dates greater than and equal to the start date.
-
-#   * When given the start and the end date, calculate the `TMIN`, `TAVG`, and `TMAX` for dates between the start and end date inclusive.
 
 if __name__ == "__main__":
     app.run(debug=True)
